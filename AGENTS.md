@@ -56,7 +56,7 @@ IMPORTANT: When adding, removing, or renaming files, directories, commands, or f
 ### Logicbroker distribution changes
 
 The fork keeps AWS engine versioning separate from the downstream distribution.
-Changes confined to `plugins/service-workflows/`, `scripts/package-lb.ts`,
+Changes confined to `plugins/service/`, `scripts/package-lb.ts`,
 `distribution/`, and their documentation, tests, and workflow use
 `distribution/lb.json` and `LB_CHANGELOG.md`. Do not bump the AWS engine version
 for those changes. Regenerate plugin projections with `bun scripts/package.ts`.

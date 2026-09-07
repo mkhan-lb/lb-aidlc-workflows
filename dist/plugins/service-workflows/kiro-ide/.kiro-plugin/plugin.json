@@ -1,8 +1,0 @@
-{
-  "name": "aidlc-service-workflows",
-  "version": "0.1.0",
-  "description": "Backend service scope using existing AWS stages",
-  "author": {
-    "name": "Logicbroker"
-  }
-}

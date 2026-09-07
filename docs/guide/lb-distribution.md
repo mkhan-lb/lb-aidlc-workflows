@@ -1,6 +1,6 @@
 # Logicbroker AI-DLC distribution
 
-This fork packages AWS AI-DLC with a small `service-workflows` plugin for backend
+This fork packages AWS AI-DLC with a small `service` plugin for backend
 work. The AWS engine and harness sources remain unchanged. Scope membership and
 guidance live in the plugin, so upstream engine updates do not require maintaining
 seven copies of the methodology.
@@ -9,8 +9,8 @@ seven copies of the methodology.
 
 | Scope | Configured stages | Intended outcome |
 | --- | --- | --- |
-| `service-workflows-backend` | 12 | One service using established domain and platform patterns, implemented and verified |
-| `service-workflows-backend-design` | 15 | The same outcome with dedicated functional and NFR design |
+| `service-backend` | 12 | One service using established domain and platform patterns, implemented and verified |
+| `service-backend-design` | 15 | The same outcome with dedicated functional and NFR design |
 | Stock `feature` | 33 | A full lifecycle including operational work |
 
 The 12-stage route retains Workspace Scaffold, Workspace Detection, State Init,
@@ -41,8 +41,8 @@ scope frontmatter for routing, but does not automatically deliver its prose.
 After installing the combined package, invoke:
 
 ```text
-/aidlc --scope service-workflows-backend
-/aidlc --scope service-workflows-backend-design
+/aidlc --scope service-backend
+/aidlc --scope service-backend-design
 ```
 
 On Codex use `$aidlc` with the same arguments. The upstream default scope is
@@ -77,7 +77,7 @@ The artifact contains:
 
 ```text
 dist/<harness>/                         combined install tree
-dist/plugins/service-workflows/<harness>/  native plugin projection
+dist/plugins/service/<harness>/         native plugin projection
 distribution-manifest.json              versions, provenance, checks, file hashes
 README.md
 LB_CHANGELOG.md
@@ -94,12 +94,12 @@ memory, knowledge, and intent history. This builder does not perform an upgrade.
 ## Versioning and verification
 
 `distribution/lb.json` identifies the downstream version and exact upstream commit.
-The initial candidate is Logicbroker distribution `0.1.0`, based on upstream commit
+The current candidate is Logicbroker distribution `0.1.1`, based on upstream commit
 `e7689885fb98d380421ec574a7fa9f3301a22205`. That source identifies its engine as
 `2.7.1` and includes the solo Code Generation Plan Approval fix; it is not an AWS
 `v2.7.1` release. The latest published AWS release checked when preparing this
 candidate was `v2.7.0`. The manifest uses `release: null` to make this distinction
-explicit. Use a distinct downstream tag such as `lb-v0.1.0` when releasing it.
+explicit. Use a distinct downstream tag such as `lb-v0.1.1` when releasing it.
 
 The builder verifies upstream ancestry, rejects changes to the engine and upstream
 packaging sources, and requires generated files to match source. For each harness

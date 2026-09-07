@@ -1,5 +1,12 @@
 # Logicbroker distribution changelog
 
+## [0.1.1] - 2026-09-07
+
+Rename the backend scopes to `service-backend` and `service-backend-design`.
+The plugin namespace is now `service`, matching AWS's required scope-name prefix.
+Stage selection and verification behavior are unchanged. Rebuild the combined
+package; the previous candidate's scope names are no longer included.
+
 ## [0.1.0] - 2026-09-07
 
 First distribution candidate, based on the exact AWS main commit recorded in

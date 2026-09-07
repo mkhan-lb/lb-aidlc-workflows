@@ -17,8 +17,8 @@ const backend = [
   "contract-design", "delivery-planning", "code-generation", "build-and-test",
 ];
 const expectedRoutes: Record<string, string[]> = {
-  "service-workflows-backend": backend,
-  "service-workflows-backend-design": [
+  "service-backend": backend,
+  "service-backend-design": [
     ...backend.slice(0, -2), "functional-design", "nfr-requirements", "nfr-design", ...backend.slice(-2),
   ],
 };
@@ -76,17 +76,17 @@ describe("combined Logicbroker distribution", () => {
         expect(orchestrator).toContain(name);
       }
       expect(verifyScopes(project, leaf, harness)).toEqual({
-        "service-workflows-backend": 12, "service-workflows-backend-design": 15,
+        "service-backend": 12, "service-backend-design": 15,
       });
       for (const stage of ["inception/requirements-analysis", "construction/code-generation", "construction/build-and-test"]) {
         const body = readFileSync(join(project, leaf, "aidlc-common/stages", `${stage}.md`), "utf8");
         expect(body).toContain(`${leaf}/scopes/<active-scope>.md`);
-        expect(body).toContain("### Backend scope guidance (service-workflows)");
+        expect(body).toContain("### Backend scope guidance (service)");
         expect(body).not.toContain("{{HARNESS_DIR}}");
       }
       installedCheck(harness, "aidlc-graph.ts", ["compile", "--check"]);
       installedCheck(harness, "aidlc-runner-gen.ts", ["scopes", "--check"]);
-      expect(json<{ plugins: string[] }>(join(project, leaf, "tools/data/harness.json")).plugins).toEqual(["aidlc", "service-workflows"]);
+      expect(json<{ plugins: string[] }>(join(project, leaf, "tools/data/harness.json")).plugins).toEqual(["aidlc", "service"]);
       expect(existsSync(join(project, "aidlc/spaces/default/intents"))).toBe(false);
     }, 30_000);
   }
@@ -106,7 +106,7 @@ describe("combined Logicbroker distribution", () => {
     const before = readFileSync(path);
     try {
       const grid = json<Grid>(path);
-      grid["service-workflows-backend"].stages["units-generation"] = "SKIP";
+      grid["service-backend"].stages["units-generation"] = "SKIP";
       writeFileSync(path, JSON.stringify(grid));
       expect(() => verifyScopes(project, ".claude", "claude")).toThrow(/units-generation/);
     } finally {
@@ -121,7 +121,7 @@ describe("combined Logicbroker distribution", () => {
     expect(actual).toEqual(manifest.files);
     expect(manifest.upstream).toEqual(RELEASE.upstream);
     expect(inventory(join(root, "dist"))).toEqual(stockBefore);
-  });
+  }, 30_000);
 
   test("refuses to overwrite an existing output", () => {
     const before = inventory(artifact);
