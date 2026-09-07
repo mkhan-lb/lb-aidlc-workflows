@@ -1,5 +1,11 @@
 # AI-DLC — one core, many harnesses
 
+> **Logicbroker fork:** The [Logicbroker distribution](docs/guide/lb-distribution.md)
+> adds backend scopes with 12 or 15 configured stages across all seven harnesses.
+> Build the combined package with `bun scripts/package-lb.ts`; the source checkout's
+> `dist/<harness>` remains the stock AWS engine. Downstream versions and changes
+> live in [LB_CHANGELOG.md](LB_CHANGELOG.md). The upstream guide follows below.
+
 ## AI-DLC Workflows 2.0 is GA on `main`
 
 AI-DLC Workflows 2.0 is **GA** on this repository's default `main` branch. Use

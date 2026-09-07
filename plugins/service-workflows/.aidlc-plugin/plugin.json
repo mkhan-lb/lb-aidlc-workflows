@@ -1,0 +1,17 @@
+{
+  "name": "service-workflows",
+  "version": "0.1.0",
+  "description": "Backend service scope using existing AWS stages",
+  "author": {
+    "name": "Logicbroker"
+  },
+  "dependencies": [
+    "core"
+  ],
+  "aidlc": {
+    "contributes": {
+      "overlays": "contributions/",
+      "scopes": "scopes/"
+    }
+  }
+}
