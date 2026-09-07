@@ -128,6 +128,13 @@ commit. Hashes detect content changes; they are not a signed release attestation
 The `Logicbroker distribution` workflow runs the dedicated tests and uploads a
 combined tarball for review. It does not create tags or publish GitHub Releases.
 
+The inherited `Deploy Documentation` workflow still builds and validates docs on
+matching pull requests and pushes. Forks skip the Pages upload and deployment by
+default because GitHub Pages must be configured separately. To publish a fork's
+site, configure Pages to use GitHub Actions, update the site and repository URLs
+in `zensical.toml`, and set the repository Actions variable `DEPLOY_DOCS` to `true`.
+Upstream documentation deployment remains enabled without that variable.
+
 ## Integrate with ai-skills
 
 The current ai-skills installer still selects AWS `v2.7.0`. This change does not
