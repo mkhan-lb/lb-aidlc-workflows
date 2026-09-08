@@ -832,6 +832,12 @@
         ],
         ".claude/tools/data/templates/.gitkeep": [
           "sha256:da10c5820101c36f22cdd2930e09d1ae4d7a8d14871f1e225ca670566afec968"
+        ],
+        ".claude/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".claude/tools/data/plugin-contrib-service.json": [
+          "sha256:ca79aaebbf4b65539e1e01a793ce66710da08f9f609f11d7c6c22cd2f24e25c0"
         ]
       },
       "blocks": {
@@ -1828,6 +1834,12 @@
         ],
         ".codex/trust-seed.toml": [
           "sha256:2d1a7aebadd6d9f03671cba37aa22c13f85ed430a423812348289bc5848e9d29"
+        ],
+        ".codex/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".codex/tools/data/plugin-contrib-service.json": [
+          "sha256:6c7e8dbe3aaedae598800d65542bf0fac2fdd58d80cc93ffc31065fed79ecbc1"
         ]
       },
       "blocks": {
@@ -2695,6 +2707,12 @@
         ],
         ".github/skills/aidlc-user-stories/SKILL.md": [
           "sha256:7ff31b3568332ca4edc23db93de57fcccb46bd77c7d71ff29d6a7ff5e8069314"
+        ],
+        ".aidlc/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".aidlc/tools/data/plugin-contrib-service.json": [
+          "sha256:eedef81bfb10d3ca988d6fdef987401f27dedb1c3f62d51f2fd491cb8d92d000"
         ]
       },
       "blocks": {
@@ -3547,6 +3565,12 @@
         ],
         ".cursor/tools/data/templates/.gitkeep": [
           "sha256:da10c5820101c36f22cdd2930e09d1ae4d7a8d14871f1e225ca670566afec968"
+        ],
+        ".cursor/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".cursor/tools/data/plugin-contrib-service.json": [
+          "sha256:9ffb770a046277681273aea6671eaae446309fc2bcd1f2bc0a99da318c8dd54c"
         ]
       },
       "blocks": {
@@ -4426,6 +4450,12 @@
         ],
         ".kiro/tools/data/templates/.gitkeep": [
           "sha256:da10c5820101c36f22cdd2930e09d1ae4d7a8d14871f1e225ca670566afec968"
+        ],
+        ".kiro/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".kiro/tools/data/plugin-contrib-service.json": [
+          "sha256:669d76e0c6beb0fef25c91f8bdd1056df85d63eac49e88f57543bb4170fe67bf"
         ]
       },
       "blocks": {
@@ -5323,6 +5353,12 @@
         ],
         ".kiro/tools/data/templates/.gitkeep": [
           "sha256:da10c5820101c36f22cdd2930e09d1ae4d7a8d14871f1e225ca670566afec968"
+        ],
+        ".kiro/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".kiro/tools/data/plugin-contrib-service.json": [
+          "sha256:669d76e0c6beb0fef25c91f8bdd1056df85d63eac49e88f57543bb4170fe67bf"
         ]
       },
       "blocks": {
@@ -6190,6 +6226,12 @@
         ],
         ".opencode/plugin/aidlc-opencode-adapter.ts": [
           "sha256:52ba3ba4a0bb89405a3d3508c2cebb4737d1e9e4b8670bf64e034e6a3bf33dc0"
+        ],
+        ".aidlc/tools/data/plugin-files-service.json": [
+          "sha256:1fdde5288d9ed249c467b8a40c6229b26026485c7f8854992ce92edac228ead5"
+        ],
+        ".aidlc/tools/data/plugin-contrib-service.json": [
+          "sha256:eedef81bfb10d3ca988d6fdef987401f27dedb1c3f62d51f2fd491cb8d92d000"
         ]
       },
       "blocks": {
