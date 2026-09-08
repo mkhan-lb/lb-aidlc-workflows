@@ -53,101 +53,134 @@ Keep service contracts, generators, repository verification commands, and team
 knowledge in the consuming repository. Reuse affirmed practices; do not copy a
 particular service's assumptions into this reusable plugin.
 
-## Build the combined package
+## Native installation and upgrades
 
-From a full checkout of `mkhan-lb/lb-aidlc-workflows`, with Git and Bun available:
+Distribution 0.2.0 uses the official AWS AI-DLC **2.8.0 native binary** with
+Logicbroker's separately versioned, harness archives carrying the service plugin. Consumers need
+neither Bun, Node.js, nor Python. Bun and TypeScript remain maintainer build tools.
+The AWS commit is `0d399dd828b59e84d90f7cc198c69fab9ad8f1a7` (`v2.8.0`).
+The service plugin remains 0.1.1; the AWS engine sources are unchanged.
+
+Use `/aidlc-workflows:install` from ai-skills for the pinned, verified installation.
+The machine install and repository configuration are separate:
+
+1. Verify the official AWS binary, runtime, and installer against the committed
+   AWS release checksums before running its native installer.
+2. Verify the selected `lb-aidlc-<harness>.tar.gz` against the downstream release
+   checksum. Never substitute GitHub's source archive or the stock AWS projection.
+3. Preview with the native command, then apply its exact plan token:
+
+```sh
+aidlc config --project-dir "$TARGET" --harness claude \
+  --from "$VERIFIED_LB_ARCHIVE" --mcp none --dry-run --json
+# Read data.planToken from the JSON response, then use that exact value:
+aidlc config --project-dir "$TARGET" --harness claude \
+  --from "$VERIFIED_LB_ARCHIVE" --mcp none --plan-token "$PLAN_TOKEN" --json
+```
+
+After refreshing, run `/aidlc plugin sync` for every installed plugin. The LB
+compose source is retained at `<harness-dir>/plugins/service`; use that path as
+`AIDLC_PLUGIN_ROOT` with `aidlc engine plugin sync`. Then run native
+`aidlc engine graph compile`, `aidlc engine gen runners`, and
+`aidlc engine gen runner-scopes` against the target harness. The explicit rebuild
+is needed when the precomposed plugin makes sync a no-op after config regenerated
+a grid from an older installation. Run one final native config preview/apply
+against the same LB archive to refresh the orchestrator tables and record the
+composed baseline. Verify the 12/15-stage routes afterward.
+
+AWS 2.8.0 refuses adding a new second harness to a configured repo. Use a separate
+checkout; preserve receipts for any compatible harnesses already installed.
+
+`--dry-run` writes nothing to the target. AWS's configuration transaction owns
+its managed-file baseline, checks for concurrent edits, and stages/rolls back its
+writes. Do not replace it with a recursive copy or blanket `--force`.
+
+Exact unchanged files from AWS 2.7.0 and LB 0.1.1 are recognized by the historical
+SHA-256 signatures in `distribution/legacy-signatures.json`. These signatures
+come only from the identified releases, never from a consuming checkout. Existing
+workspace memory, project knowledge, and history are preserved. Existing 2.7.2
+workflow records need no migration; earlier releases must follow intervening
+AWS upgrade notes. Retired unowned
+copy-channel tool files can remain on disk; the installed entry points invoke the
+native executable and do not require those TypeScript files or Bun.
+
+Locally modified framework files, including customized host settings, remain
+conflicts. Compare old/current/new files, preserve provider/model, permission,
+custom hooks and instructions, and review the reconciliation separately before
+retrying. A conflict is not a successful upgrade. Settings embedded in legacy
+`harness.json` need migration to AWS's layered `aidlc.settings.json`; report the
+specific keys instead of dropping them. Unknown versions have no automatic
+ownership grant. Back up reconciled files and keep changes reviewable in Git.
+
+AWS 2.8.0 refuses refresh while any unfinished workflow exists, including parked
+intents. Finish or explicitly resolve that workflow before retrying; do not mark
+it complete just to install an update. Updating the machine binary alone does not
+migrate a repository. A project with an older `.aidlc-version` pin also needs an
+explicit pin transition; report it before changing the project's intended version.
+
+Always pass the **verified LB archive** on future repository refreshes. Plain
+`aidlc config` selects the stock installed AWS runtime and can remove the LB
+contributions it previously owned. `aidlc update` updates the machine runtime,
+not the LB distribution pin or repository. Native engine and LB project updates
+must be tested and repinned together in ai-skills.
+
+Keep the internal Logicbroker readiness scorer in its managed version directory
+or expose it as `aidlc-readiness`. AWS owns the `aidlc` workflow command. The AWS
+installer refuses to overwrite an unrelated executable at its destination.
+
+## Build and release
+
+Maintainers need Git, Bun, and a verified official AWS 2.8.0 native executable.
+Fetch the native binary from the official release and verify its checksum before
+setting `LB_AIDLC_NATIVE_EXECUTABLE`. The distribution CI demonstrates the exact
+Linux checksum and how to prepare both immutable historical fixture directories.
 
 ```sh
 bun install --frozen-lockfile
-bun scripts/package.ts
 bun run check
+export LB_AIDLC_NATIVE_EXECUTABLE=/absolute/path/to/verified/aidlc
+export LB_AIDLC_LEGACY_ROOT=/absolute/path/to/legacy-fixtures
 bun test tests/distribution/lb.test.ts
 bun scripts/package-lb.ts build/lb-aidlc-workflows
 ```
 
-The output directory must not already exist. The first packaging command generates
-the stock engine and separate plugin projections. The second stages copies,
-enables and composes the plugin, and checks every harness: Claude Code, Codex CLI,
-GitHub Copilot, Cursor, Kiro CLI, Kiro IDE, and opencode. The source checkout's
-`dist/<harness>` remains stock; use the combined build output to install this
-distribution. GitHub's automatically generated source ZIP/tarball is not the
-combined distribution.
+The fixture root contains `aws270/dist/<harness>` from commit
+`96b11d39028955d4f92375e783525db5275cdfd8`, and `lb011/dist/<harness>` from
+the verified LB 0.1.1 combined asset. Its SHA-256 is
+`b76f728eae02b7d2aa9d4bdd2f407b50d3e0508b0ccdea8d048fe54b6c4f44b9`.
+The historical-signature map records all shared framework-file paths (excluding
+project-owned `aidlc/`) and exact legacy managed-block root files. To regenerate,
+hash those files from the verified release directories, union the hashes by
+harness/path, and retain the source commit and archive checksum in the map.
 
-The artifact contains:
+The output directory must be new. The builder copies `dist-release/<harness>`,
+composes the service plugin through the native engine, and validates all seven
+harnesses. Installation archives carry the composed engine and retained plugin. Both `dist/` and `dist-release/` are ignored build outputs, never committed.
 
 ```text
-dist/<harness>/                         combined install tree
-dist/plugins/service/<harness>/         native plugin projection
-distribution-manifest.json              versions, provenance, checks, file hashes
-README.md
-LB_CHANGELOG.md
-LICENSE
+runtime/<harness>/                     verified composed reference projection
+lb-aidlc-<harness>.tar.gz               native config --from input (flat root)
+dist/plugins/service/<harness>/        plugin projection used during composition
+distribution-manifest.json             source versions, verification, all hashes
+README.md / LB_CHANGELOG.md / LICENSE
 ```
 
-The plugin is already composed and enabled in each install tree; a separate host
-plugin registration is unnecessary for these scopes. Use the corresponding AWS
-harness installation procedure against the artifact's `dist/<harness>` tree. For
-Cursor, its emitted `install.ts` remains the installation entry point. For an
-existing project, merge configuration and instruction files and preserve project
-memory, knowledge, and intent history. This builder does not perform an upgrade.
+AWS's Codex compose hook still checks `.codex/skills`; the builder completes its
+runners in `.agents/skills` and retains explicit invocation. opencode's missing
+stage-table marker is accepted only when the table is proven unchanged. No
+engine or compose-hook source is patched.
 
-## Versioning and verification
+The tests exercise native commands with Bun and Node absent from PATH, verify
+12/15-stage scope routes across seven harnesses, and cover archive installation,
+legacy adoption, conflicts, dry-run preservation, and repeat configuration. They
+do not claim a live model completed a service in every harness.
 
-`distribution/lb.json` identifies the downstream version and exact upstream commit.
-The current candidate is Logicbroker distribution `0.1.1`, based on upstream commit
-`e7689885fb98d380421ec574a7fa9f3301a22205`. That source identifies its engine as
-`2.7.1` and includes the solo Code Generation Plan Approval fix; it is not an AWS
-`v2.7.1` release. The latest published AWS release checked when preparing this
-candidate was `v2.7.0`. The manifest uses `release: null` to make this distinction
-explicit. Use a distinct downstream tag such as `lb-v0.1.1` when releasing it.
+Publish from a clean reviewed commit using a distinct downstream tag
+`lb-v0.2.0`. Publish the seven harness archives, manifest, and combined tarball;
+record their actual SHA-256 values in ai-skills only after verifying the published
+assets. AWS's binary and runtime retain their official AWS provenance. Do not
+relabel a fork binary as an official AWS release.
 
-The builder verifies upstream ancestry, rejects changes to the engine and upstream
-packaging sources, and requires generated files to match source. For each harness
-it rejects unhandled composition drops, proves composition is idempotent, and validates both
-scope grids against the required artifact dependencies in brownfield mode. Tests
-also check relocation, unchanged stock routes, and artifact hashes. No test here
-claims that a live model completed a service in every host application.
-
-The pinned AWS compose hook checks `.codex/skills`, although Codex discovers
-`.agents/skills`. The builder handles only that exact advisory by running AWS's
-installed runner generator against the native path and adding the same explicit
-invocation policy as AWS's Codex emitter. Tests verify the native shortcuts and
-their policy files. The manifest records this packaging adapter; no engine or
-compose-hook source is patched. Prefer the combined tree over installing the
-standalone Codex plugin projection until upstream fixes this check.
-
-The opencode shell has no generated stage-summary region. Its exact missing-marker
-advisory is accepted only after verifying that the generated stage table is
-unchanged from stock. Its scope table and runners are still regenerated and tested.
-
-The manifest records the checkout commit, dirty-worktree status, engine/plugin
-versions, and SHA-256 hashes for every other artifact file. A local dirty build is
-a review candidate, not an immutable release. Publish from a clean, reviewed
-commit. Hashes detect content changes; they are not a signed release attestation.
-
-The `Logicbroker distribution` workflow runs the dedicated tests and uploads a
-combined tarball for review. It does not create tags or publish GitHub Releases.
-
-The inherited `Deploy Documentation` workflow still builds and validates docs on
-matching pull requests and pushes. Forks skip the Pages upload and deployment by
-default because GitHub Pages must be configured separately. To publish a fork's
-site, configure Pages to use GitHub Actions, update the site and repository URLs
-in `zensical.toml`, and set the repository Actions variable `DEPLOY_DOCS` to `true`.
-Upstream documentation deployment remains enabled without that variable.
-
-## Integrate with ai-skills
-
-The current ai-skills installer still selects AWS `v2.7.0`. This change does not
-switch it or alter a shared-services project. The next integration should:
-
-1. Download a version-pinned combined release asset from this fork, rather than a
-   GitHub source archive, and verify its recorded provenance and file inventory.
-2. Select the requested harness and merge its project configuration while
-   preserving memory, intent records, knowledge, and project-owned settings.
-3. Verify that both scopes are available after installation; select one explicitly
-   for the next service intent.
-
-For upstream updates, advance the pinned commit, review AWS changes, regenerate
-the projections, and rerun the same seven-harness checks before publishing a new
-downstream version. Keep the plugin isolated unless an actual engine limitation
-requires an upstream fix.
+The `Logicbroker distribution` workflow produces a candidate artifact; it does
+not publish releases or switch consumer repositories. The fork's documentation
+workflow requires the `DEPLOY_DOCS=true` repository variable to deploy Pages.

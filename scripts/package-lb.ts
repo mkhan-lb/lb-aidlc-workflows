@@ -5,7 +5,15 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readPluginDropEntries, runPluginCompose } from "../core/tools/aidlc-plugin-test.ts";
+import { readPluginDropEntries } from "../core/tools/aidlc-plugin-test.ts";
+import { createTarGz } from "../core/tools/aidlc-archive.ts";
+import type { ProjectionDescriptor } from "../core/tools/aidlc-distribution.ts";
+
+export function nativeExecutable(): string {
+  const executable = process.env.LB_AIDLC_NATIVE_EXECUTABLE;
+  if (!executable) throw new Error("Set LB_AIDLC_NATIVE_EXECUTABLE to the verified AWS release binary (build/test prerequisite only).");
+  return resolve(executable);
+}
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const RELEASE = JSON.parse(readFileSync(join(ROOT, "distribution/lb.json"), "utf8")) as {
@@ -74,8 +82,8 @@ export function verifyScopes(project: string, leaf: string, harness: string): Re
     for (const scope of RELEASE.scopes) {
       if (!grid[scope]) throw new Error(`${harness}: missing scope ${scope}`);
       writeFileSync(proposal, JSON.stringify(grid[scope]));
-      const proof = JSON.parse(run(process.execPath, [
-        join(project, leaf, "tools/aidlc-graph.ts"), "validate-grid", "--proposal", proposal,
+      const proof = JSON.parse(run(nativeExecutable(), [
+        "engine", "graph", "validate-grid", "--proposal", proposal,
         "--strict", "--project-type", "brownfield",
       ], project, graphEnvironment(project, leaf, harness))) as {
         valid: boolean; errors: string[]; advisories: string[]; summary: { execute: number };
@@ -95,9 +103,8 @@ function completeCodexRunners(project: string): void {
   // The pinned compose hook checks .codex/skills before calling runner-gen.
   // The installed generator already resolves Codex's real .agents/skills path.
   const env = graphEnvironment(project, ".codex", "codex");
-  const generator = join(project, ".codex/tools/aidlc-runner-gen.ts");
-  run(process.execPath, [generator, "write"], project, env);
-  run(process.execPath, [generator, "scopes"], project, env);
+  run(nativeExecutable(), ["engine", "gen", "runners"], project, env);
+  run(nativeExecutable(), ["engine", "gen", "runner-scopes"], project, env);
   for (const scope of RELEASE.scopes) {
     const guardDir = join(project, ".agents/skills", scope, "agents");
     mkdirSync(guardDir, { recursive: true });
@@ -107,6 +114,8 @@ function completeCodexRunners(project: string): void {
 }
 
 export function assemble(output: string): string {
+  const version = JSON.parse(run(nativeExecutable(), ["version", "--json"]));
+  if (version.binaryVersion !== RELEASE.upstream.engineVersion) throw new Error("Native binary version differs from distribution provenance.");
   const destination = resolve(output);
   if (existsSync(destination)) throw new Error(`Output already exists: ${destination}. Choose a new output directory.`);
   run("git", ["merge-base", "--is-ancestor", RELEASE.upstream.commit, "HEAD"]);
@@ -124,17 +133,23 @@ export function assemble(output: string): string {
   try {
     const checks: Record<string, Record<string, number>> = {};
     for (const harness of RELEASE.harnesses) {
-      const project = join(staging, "dist", harness);
+      const project = join(staging, "runtime", harness);
       const plugin = join(staging, "dist/plugins", RELEASE.plugin, harness);
-      cpSync(join(ROOT, "dist", harness), project, { recursive: true });
+      cpSync(join(ROOT, "dist-release", harness), project, { recursive: true });
       cpSync(join(ROOT, "dist/plugins", RELEASE.plugin, harness), plugin, { recursive: true });
       const leaf = harnessLeaf(harness);
+      // Retain the native compose source in the installed harness so a refresh
+      // can run plugin sync after the temporary release download is removed.
+      cpSync(plugin, join(project, leaf, "plugins", RELEASE.plugin), { recursive: true });
       const configPath = join(project, leaf, "tools/data/harness.json");
       const config = JSON.parse(readFileSync(configPath, "utf8"));
       config.plugins = ["aidlc", RELEASE.plugin];
       writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
       const compose = (): void => {
-        const result = runPluginCompose({ harness, harnessLeaf: leaf, projectDir: project, pluginBuilt: plugin });
+        run(nativeExecutable(), ["engine", "plugin", "sync"], project, {
+          ...graphEnvironment(project, leaf, harness),
+          AIDLC_PLUGIN_ROOT: plugin,
+        });
         const drops = readPluginDropEntries(project, RELEASE.plugin);
         const unexpected = drops.filter((entry) => {
           if (entry.severity !== "advisory") return true;
@@ -142,14 +157,13 @@ export function assemble(output: string): string {
           if (harness === "opencode" && entry.message === "stage-table refresh skipped: SKILL.md missing BEGIN marker") {
             // opencode intentionally has no stage summary region. This plugin
             // may change scope membership, but must leave the stage table equal.
-            const utility = "tools/aidlc-utility.ts";
-            const stock = join(ROOT, "dist", harness);
-            return run(process.execPath, [join(project, leaf, utility), "stage-table"], project, graphEnvironment(project, leaf, harness)) !==
-              run(process.execPath, [join(stock, leaf, utility), "stage-table"], stock, graphEnvironment(stock, leaf, harness));
+            const stock = join(ROOT, "dist-release", harness);
+            return run(nativeExecutable(), ["engine", "gen", "stage-table"], project, graphEnvironment(project, leaf, harness)) !==
+              run(nativeExecutable(), ["engine", "gen", "stage-table"], stock, graphEnvironment(stock, leaf, harness));
           }
           return true;
         });
-        if (result.status !== 0 || unexpected.length) throw new Error(`${harness}: compose failed\n${result.stderr}\n${result.stdout}\n${JSON.stringify(unexpected)}`);
+        if (unexpected.length) throw new Error(`${harness}: compose failed\n${JSON.stringify(unexpected)}`);
         if (harness === "codex") completeCodexRunners(project);
         // Every advisory must fail, be repaired, or prove irrelevant above.
         // Do not hash timestamped build health logs into the install tree.
@@ -159,6 +173,28 @@ export function assemble(output: string): string {
       const first = inventory(project);
       compose();
       if (JSON.stringify(first) !== JSON.stringify(inventory(project))) throw new Error(`${harness}: second composition changed the package.`);
+      // Native config may adopt only bytes proven to come from a prior release.
+      // Local modifications remain conflicts; workspace files are never included.
+      const signatures = JSON.parse(readFileSync(join(ROOT, "distribution/legacy-signatures.json"), "utf8")) as {
+        harnesses: Record<string, { files: Record<string, string[]>; blocks: Record<string, string[]> }>;
+      };
+      const legacy = signatures.harnesses[harness];
+      const descriptorPath = join(project, leaf, "tools/data/aidlc-projection.json");
+      const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8")) as ProjectionDescriptor;
+      descriptor.legacyManagedFileHashes ??= {};
+      for (const [path, hashes] of Object.entries(legacy.files)) {
+        descriptor.legacyManagedFileHashes[path] = [...new Set([
+          ...(descriptor.legacyManagedFileHashes[path] ?? []), ...hashes,
+        ])];
+      }
+      for (const integration of descriptor.rootIntegrations) {
+        if (!legacy.blocks[integration.path]) continue;
+        integration.legacySignatures ??= {};
+        integration.legacySignatures.wholeFileHashes = [...new Set([
+          ...(integration.legacySignatures.wholeFileHashes ?? []), ...legacy.blocks[integration.path],
+        ])];
+      }
+      writeFileSync(descriptorPath, `${JSON.stringify(descriptor, null, 2)}\n`);
       checks[harness] = verifyScopes(project, leaf, harness);
       console.log(`[${harness}] composed and verified ${JSON.stringify(checks[harness])}`);
     }
@@ -168,6 +204,7 @@ export function assemble(output: string): string {
     const pluginMetadata = JSON.parse(readFileSync(join(ROOT, "plugins", RELEASE.plugin, ".aidlc-plugin/plugin.json"), "utf8"));
     const metadata = {
       ...RELEASE,
+      channel: "native",
       sourceCommit: run("git", ["rev-parse", "HEAD"]).trim(),
       workingTreeDirty: run("git", ["status", "--porcelain"]).trim().length > 0,
       pluginVersion: pluginMetadata.version,
@@ -176,6 +213,23 @@ export function assemble(output: string): string {
       verification: { kind: "deterministic-composition-and-artifact-dependencies", scopes: checks },
       files: inventory(staging),
     };
+    writeFileSync(join(staging, "distribution-manifest.json"), `${JSON.stringify(metadata, null, 2)}\n`);
+    // Each archive is a complete projection root accepted by native `config
+    // --from`. Consumers never extract arbitrary tar members themselves.
+    for (const harness of RELEASE.harnesses) {
+      const project = join(staging, "runtime", harness);
+      const files = inventory(project);
+      const entries = Object.keys(files).map((path) => ({
+        path,
+        type: "file" as const,
+        mode: lstatSync(join(project, path)).mode & 0o777,
+        data: readFileSync(join(project, path)),
+      }));
+      writeFileSync(join(staging, `lb-aidlc-${harness}.tar.gz`), createTarGz(entries));
+    }
+    // The manifest covers the archives as well as their expanded source trees.
+    metadata.files = inventory(staging);
+    delete metadata.files["distribution-manifest.json"];
     writeFileSync(join(staging, "distribution-manifest.json"), `${JSON.stringify(metadata, null, 2)}\n`);
     renameSync(staging, destination);
     return destination;

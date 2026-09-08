@@ -24,6 +24,29 @@ jobs:
         with:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile
+      - name: Fetch the pinned AWS native engine for consumer tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/aws-aidlc"
+          gh release download v2.8.0 --repo awslabs/aidlc-workflows \
+            --pattern aidlc-linux-x64 --dir "$RUNNER_TEMP/aws-aidlc"
+          cd "$RUNNER_TEMP/aws-aidlc"
+          echo 'c7ddca2449823d05d4d4e80bd424fc7a58acad754452b4a61ca55221753dcc88  aidlc-linux-x64' | sha256sum --check
+          chmod +x aidlc-linux-x64
+          echo "LB_AIDLC_NATIVE_EXECUTABLE=$RUNNER_TEMP/aws-aidlc/aidlc-linux-x64" >> "$GITHUB_ENV"
+      - name: Fetch verified legacy migration fixtures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/legacy/aws270" "$RUNNER_TEMP/legacy/lb011"
+          git archive 96b11d39028955d4f92375e783525db5275cdfd8 dist | tar -xf - -C "$RUNNER_TEMP/legacy/aws270"
+          gh release download lb-v0.1.1 --repo mkhan-lb/lb-aidlc-workflows \
+            --pattern lb-aidlc-workflows.tar.gz --dir "$RUNNER_TEMP/legacy"
+          cd "$RUNNER_TEMP/legacy"
+          echo 'b76f728eae02b7d2aa9d4bdd2f407b50d3e0508b0ccdea8d048fe54b6c4f44b9  lb-aidlc-workflows.tar.gz' | sha256sum --check
+          tar -xzf lb-aidlc-workflows.tar.gz --strip-components=1 -C lb011
+          echo "LB_AIDLC_LEGACY_ROOT=$RUNNER_TEMP/legacy" >> "$GITHUB_ENV"
       - run: bun run check
       - run: bun test tests/distribution/lb.test.ts
       - name: Build combined candidate

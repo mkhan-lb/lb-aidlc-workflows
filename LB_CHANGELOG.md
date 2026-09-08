@@ -1,5 +1,17 @@
 # Logicbroker distribution changelog
 
+## [0.2.0] - 2026-09-08
+
+Upgrade to official AWS AI-DLC 2.8.0 and its native consumer channel. Refresh
+repositories through a verified LB archive and AWS's transactional `aidlc config`.
+
+- Remove Bun/Node/Python from consumer installation and runtime prerequisites.
+- Preserve service-backend and service-backend-design across all seven harnesses.
+- Recognize exact AWS 2.7.0 and LB 0.1.1 legacy files; retain modified-file conflicts
+  and workspace preservation instead of silently overwriting existing projects.
+- Emit per-harness native archives and stop tracking generated plugin projections.
+- Document the separate machine/repository update lifecycle and readiness CLI name.
+
 ## [0.1.1] - 2026-09-07
 
 Rename the backend scopes to `service-backend` and `service-backend-design`.
