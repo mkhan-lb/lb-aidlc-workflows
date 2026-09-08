@@ -62,13 +62,27 @@ The AWS commit is `0d399dd828b59e84d90f7cc198c69fab9ad8f1a7` (`v2.8.0`).
 The service plugin remains 0.1.1; the AWS engine sources are unchanged.
 
 Use `/aidlc-workflows:install` from ai-skills for the pinned, verified installation.
-The machine install and repository configuration are separate:
+AWS's lifecycle is `aidlc update`, then `aidlc doctor` and `aidlc config` in each
+project **between workflows**, followed by `/aidlc plugin sync` for projects with
+plugins. The machine update does not rewrite existing projects. For Logicbroker,
+the installer pins the native update and supplies the verified LB archive to
+project config:
 
 1. Verify the official AWS binary, runtime, and installer against the committed
    AWS release checksums before running its native installer.
 2. Verify the selected `lb-aidlc-<harness>.tar.gz` against the downstream release
    checksum. Never substitute GitHub's source archive or the stock AWS projection.
-3. Preview with the native command, then apply its exact plan token:
+3. Update an existing native machine installation from the verified AWS release
+   directory, or use the verified AWS installer for the first native installation:
+
+```sh
+aidlc update --version 2.8.0 --from "$VERIFIED_AWS_RELEASE_DIR" --offline
+```
+
+4. Run `aidlc doctor --project-dir "$TARGET"` before refreshing that project.
+   An older project projection is expected until config runs. Address any settings
+   conflicts, version pin transition, or unfinished workflow before applying.
+5. Preview with the native command, then apply its exact plan token:
 
 ```sh
 aidlc config --project-dir "$TARGET" --harness claude \
