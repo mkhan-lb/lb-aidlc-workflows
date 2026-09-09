@@ -1,8 +1,0 @@
-{
-  "name": "aidlc-service",
-  "version": "0.1.1",
-  "description": "Backend service scope using existing AWS stages",
-  "author": {
-    "name": "Logicbroker"
-  }
-}

@@ -1,13 +1,24 @@
 {
   "name": "lb-aidlc-workflows",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "upstream": {
     "repository": "awslabs/aidlc-workflows",
-    "commit": "e7689885fb98d380421ec574a7fa9f3301a22205",
-    "engineVersion": "2.7.1",
-    "release": null
+    "commit": "0d399dd828b59e84d90f7cc198c69fab9ad8f1a7",
+    "engineVersion": "2.8.0",
+    "release": "v2.8.0"
   },
   "plugin": "service",
-  "scopes": ["service-backend", "service-backend-design"],
-  "harnesses": ["claude", "codex", "copilot", "cursor", "kiro", "kiro-ide", "opencode"]
+  "scopes": [
+    "service-backend",
+    "service-backend-design"
+  ],
+  "harnesses": [
+    "claude",
+    "codex",
+    "copilot",
+    "cursor",
+    "kiro",
+    "kiro-ide",
+    "opencode"
+  ]
 }
