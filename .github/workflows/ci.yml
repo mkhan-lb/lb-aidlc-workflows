@@ -151,7 +151,7 @@ jobs:
       # green smoke+unit gate. Fixture git repos are hermetic (self-owned
       # config), so no runner git identity is required.
       - name: Run deterministic integration + e2e tiers
-        run: bun tests/run-tests.ts --integration --e2e --no-llm --parallel 8
+        run: bun tests/run-tests.ts --integration --e2e --no-llm --parallel 2
 
   changelog-guard:
     name: Changelog completeness
