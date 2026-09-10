@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.8.1] - 2026-09-08
+
+Fix defects found while exercising the 2.8.0 native install: the guided `aidlc config` setup cancelled itself when Enter was pressed to accept a default, `aidlc update` on an already-current install failed its integrity check under a normal shell umask, and every native GitHub Copilot and Cursor hook was dead because the 2.8.0 packager projected those adapters onto the one-argument core-hook route. **Upgrade:** `aidlc update`, or `install.sh --version 2.8.1` / `install.ps1 -Version 2.8.1`. Copilot and Cursor projects configured by 2.8.0 work as soon as the binary is updated: their existing `aidlc engine hook <harness>-adapter ...` wiring is accepted, and the 2.8.0 Copilot adapter still installed in the project (whose core-hook calls are the bare `aidlc hook <name>`) is accepted too. `aidlc config` in the project then rewrites the wiring to the canonical `aidlc engine adapter <harness> ...` spelling and installs the current adapter — Cursor's merged `.cursor/hooks.json` collapses every earlier AI-DLC spelling of an entry (bun-era and 2.8.0) into the one shipped entry instead of leaving duplicates that keep executing, and Copilot's `.github/hooks/aidlc.json` is regenerated.
+
+* Pressing Enter at a bracketed default in the first-run `aidlc config` wizard (harness picker, provider, region, preset, plugins, MCP, record layer, and the final `Apply? [Y/n]` gate) now accepts the default as advertised instead of printing `Nothing written.` and exiting 2. Closing stdin (Ctrl-D) still cancels.
+* `aidlc update` on an install that is already at the latest release now reports `You're on the latest version of aidlc (X.Y.Z).` regardless of the caller's umask; previously it failed with `existing X.Y.Z runtime does not match the verified release` (exit 4) unless the shell umask was `077`. Same-release identity is now decided by path set and content; the installed tree's modes are still enforced against its own recorded integrity baseline, so trees installed by 2.8.0 under any umask keep working. `aidlc update --dry-run` on a current install says so instead of `Would update aidlc from X to X.`
+* `aidlc doctor` no longer tells you to copy the workspace shell from `dist/<harness>/`; the remediation is `aidlc config`.
+* README: removed the pre-2.8.0 note that told users to install from a source checkout until native assets shipped.
+* GitHub Copilot hooks no longer fail on every event with `aidlc: undefined is not an object (evaluating 'input.length')`; the adapter's delegated audit, sensor, guard, state, and Stop hooks now run through `aidlc engine hook <name>` under the native binary.
+* Cursor IDE `failClosed` `preToolUse` hooks now emit `{"permission":"allow"}` on allowed tools instead of returning no output (`Hook ... returned no output`) and blocking every tool call; deny decisions continue to emit Cursor permission-deny JSON.
+* Native hook wiring dispatches through `aidlc engine adapter copilot <target>` and `aidlc engine adapter cursor <target>`, preserving each adapter's target and stdin payload. Closes #1061 and #1058.
+
 ## [2.8.0] - 2026-09-08
 
 AI-DLC 2.8.0 consolidates the 2.7.x release cycle into a new minor baseline without changing runtime behavior from 2.7.2. **Upgrade:** use `install.sh --version 2.8.0`, `install.ps1 -Version 2.8.0`, or replace a manual copy with `runtime/<harness>/` from `aidlc-runtime-2.8.0.tar.gz`. Existing 2.7.2 workflow records require no migration. Upgrades from earlier releases must still apply every intervening **Upgrade**, **Breaking**, and migration note below.

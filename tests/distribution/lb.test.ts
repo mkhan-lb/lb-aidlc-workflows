@@ -106,6 +106,17 @@ function runtimeContent(project: string): Record<string, string> {
   return files;
 }
 
+function nativeJson(project: string, harness: string, args: string[]) {
+  const result = spawnSync(nativeExecutable(), args, {
+    cwd: project, env: graphEnvironment(project, harnessLeaf(harness), harness),
+    encoding: "utf8", timeout: 60_000,
+  });
+  return { exitCode: result.status, ...JSON.parse(result.stdout) as {
+    ok: boolean; message: string;
+    data: { effective: { agent: string; model?: string; effort?: string }[] };
+  } };
+}
+
 describe("native consumer migration", () => {
   for (const legacy of ["aws270", "lb011"]) {
     test(`${legacy}: adopts verified files and preserves project history without Bun or Node`, () => {
@@ -115,6 +126,11 @@ describe("native consumer migration", () => {
       cpSync(join(baselineRoot, legacy, "dist/claude"), project, { recursive: true });
       const memory = join(project, "aidlc/spaces/default/memory/project.md");
       writeFileSync(memory, "Repository-specific rules and architecture.\n");
+      const org = join(project, "aidlc/spaces/default/memory/org.md");
+      const originalRules = readFileSync(org, "utf8");
+      // The companion previews this targeted policy adoption separately;
+      // native config must preserve its body and the chosen persistent policy.
+      writeFileSync(org, `---\ntier_cap: templated\n---\n\n${originalRules}`);
       writeFileSync(join(project, ".aidlc-workflows.json"), '{"harnesses":{"codex":{"ref":"old-pin"}}}\n');
       const before = inventory(project);
       const plan = configure(project, "claude", ["--dry-run"]);
@@ -125,6 +141,8 @@ describe("native consumer migration", () => {
       expect(applied.ok, applied.message).toBe(true);
       syncService(project, "claude");
       expect(readFileSync(memory, "utf8")).toBe("Repository-specific rules and architecture.\n");
+      expect(readFileSync(org, "utf8")).toBe(`---\ntier_cap: templated\n---\n\n${originalRules}`);
+      expect(nativeJson(project, "claude", ["config", "models", "--check", "--json"]).ok).toBe(true);
       expect(readFileSync(join(project, ".aidlc-workflows.json"), "utf8")).toContain('"old-pin"');
       expect(readFileSync(join(project, ".claude/settings.json"), "utf8")).not.toContain("bun ");
       expect(verifyScopes(project, ".claude", "claude")).toEqual({ "service-backend": 12, "service-backend-design": 15 });
@@ -187,6 +205,22 @@ describe("native consumer migration", () => {
 });
 
 describe("combined Logicbroker distribution", () => {
+  test("Claude inherits provider choices without changing stock AWS settings or native hooks", () => {
+    const settings = json<{ env: Record<string, string>; hooks: unknown; permissions: unknown }>(join(artifact, "runtime/claude/.claude/settings.json"));
+    const stock = json<{ env: Record<string, string>; hooks: unknown; permissions: unknown }>(join(root, "dist-release/claude/.claude/settings.json"));
+    expect(stock.env.CLAUDE_CODE_USE_BEDROCK).toBe("1");
+    expect(settings.env.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+    expect(settings.env.AWS_REGION).toBeUndefined();
+    expect(Object.keys(settings.env).some((key) => /^ANTHROPIC_DEFAULT_.*_MODEL$/.test(key))).toBe(false);
+    expect(settings.env.AWS_AIDLC_DEFAULT_SCOPE).toBe(stock.env.AWS_AIDLC_DEFAULT_SCOPE);
+    expect(settings.hooks).toEqual(stock.hooks);
+    expect(settings.permissions).toEqual(stock.permissions);
+    const onboarding = readFileSync(join(artifact, "runtime/claude/.claude/CLAUDE.md"), "utf8");
+    expect(onboarding).toContain("**Model provider**");
+    expect(onboarding).toContain("Direct Claude users need their Claude login");
+    expect(onboarding).not.toContain("**AWS Bedrock access**");
+  });
+
   test("includes exactly the seven requested AWS harnesses", () => {
     expect([...RELEASE.harnesses].sort()).toEqual(Object.keys(nativeSkills).sort());
   });
@@ -226,6 +260,13 @@ describe("combined Logicbroker distribution", () => {
       const configured = configure(consumer, harness, ["--yes"]);
       expect(configured.ok, configured.message).toBe(true);
       syncService(consumer, harness);
+      const modelCheck = nativeJson(consumer, harness, ["config", "models", "--check", "--json"]);
+      expect(modelCheck.ok, modelCheck.message).toBe(true);
+      const modelState = nativeJson(consumer, harness, ["config", "models", "--show", "--json"]);
+      for (const agent of modelState.data.effective) {
+        expect(agent.model === undefined || agent.model === "inherit").toBe(true);
+        expect(agent.effort).toBeUndefined();
+      }
       expect(verifyScopes(consumer, leaf, harness)).toEqual({ "service-backend": 12, "service-backend-design": 15 });
       expect(readFileSync(join(consumer, nativeSkills[harness], "service-backend/SKILL.md"), "utf8")).toContain("next --scope service-backend");
       if (harness === "codex") {
@@ -235,6 +276,38 @@ describe("combined Logicbroker distribution", () => {
         }
       }
     }, 60_000);
+  }
+
+  for (const harness of ["codex", "opencode"]) {
+    test(`${harness}: native model choices survive repeated LB refreshes`, () => {
+      const project = join(temporary, `policy-${harness}`);
+      mkdirSync(project);
+      expect(configure(project, harness, ["--yes"]).ok).toBe(true);
+      const model = harness === "codex" ? "chosen-provider-model" : "chosen-provider/chosen-model";
+      const selected = nativeJson(project, harness, ["config", "models", "--agent", "architecture-reviewer",
+        "--model", model, "--effort", "high", "--project", "--yes", "--json"]);
+      expect(selected.ok, selected.message).toBe(true);
+      const policy = readFileSync(join(project, "aidlc.settings.json"), "utf8");
+      for (let pass = 0; pass < 2; pass++) {
+        const plan = configure(project, harness, ["--dry-run"]);
+        expect(plan.ok, plan.message).toBe(true);
+        expect(configure(project, harness, ["--plan-token", plan.data!.planToken]).ok).toBe(true);
+        expect(readFileSync(join(project, "aidlc.settings.json"), "utf8")).toBe(policy);
+        const state = nativeJson(project, harness, ["config", "models", "--show", "--json"]);
+        const reviewer = state.data.effective.find((agent: { agent: string }) => agent.agent === "architecture-reviewer");
+        expect(reviewer).toBeDefined();
+        expect(reviewer!.model).toBe(model);
+        expect(reviewer!.effort).toBe("high");
+        const lead = state.data.effective.find((agent: { agent: string }) => agent.agent === "product-lead");
+        expect(lead).toBeDefined();
+        expect(lead!.model).toBeUndefined();
+        expect(nativeJson(project, harness, ["config", "models", "--check", "--json"]).ok).toBe(true);
+      }
+      if (harness === "codex") {
+        const config = readFileSync(join(project, ".codex/config.toml"), "utf8");
+        expect(config).not.toMatch(/^model(?:_provider|_context_window|_reasoning_effort)?\s*=/m);
+      }
+    }, 90_000);
   }
 
   test("Codex shortcuts use native discovery and require explicit invocation", () => {

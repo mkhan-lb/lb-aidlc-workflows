@@ -1,5 +1,36 @@
 # Logicbroker distribution changelog
 
+## [0.2.3] - 2026-09-10
+
+Agent roles inherit the host session's model and effort through AWS 2.8.1's persistent `tier_cap: templated` policy. Existing projects must reconcile that frontmatter setting without replacing their memory or conventions; explicit model choices remain in `aidlc.settings.json`.
+
+- Remove Codex's automatic Bedrock provider, model, context-window and effort selection; retain the inactive AWS profile/region definition for native provider configuration and require Bedrock users to review those values.
+- Remove provider-specific Codex/OpenCode reviewer pins from executable and reference agent surfaces. Native configuration and repeated LB refreshes retain inheritance and explicit per-agent overrides.
+- Remove Kiro's model-specific effort default and update host model/provider onboarding.
+- Keep the official AWS 2.8.1 native engine and authored upstream sources unchanged.
+
+## [0.2.2] - 2026-09-10
+
+Complete the 2.8.1 provider change before promoting the release candidate. The
+Claude onboarding instructions now agree with its settings: use the developer's
+chosen provider, with Bedrock optional. Upgrade through the matching ai-skills pin.
+
+- Remove the stale claim that fresh LB Claude projects require Bedrock credentials.
+- Supersede the 0.2.1 prerelease without changing its published assets or tag.
+
+## [0.2.1] - 2026-09-10
+
+Refresh the LB distribution onto official AWS AI-DLC 2.8.1. Update the native
+machine runtime and refresh each project between workflows using the verified LB
+archive, followed by plugin sync. No manual workflow-record migration is required.
+
+- Include AWS's same-version update, native hook dispatch, and Plan Approval fixes.
+- Stop forcing Bedrock and AWS model pins in fresh LB Claude projections; retain
+  existing developer provider choices when reviewing an upgrade.
+- Keep both service scopes and all seven harness projections, with unchanged AWS
+  engine source and service plugin 0.1.1.
+- Document the native manifest's deletion risk for repo-authored harness knowledge.
+
 ## [0.2.0] - 2026-09-08
 
 Upgrade to official AWS AI-DLC 2.8.0 and its native consumer channel. Refresh

@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import { readPluginDropEntries } from "../core/tools/aidlc-plugin-test.ts";
 import { createTarGz } from "../core/tools/aidlc-archive.ts";
 import type { ProjectionDescriptor } from "../core/tools/aidlc-distribution.ts";
+import { applyModelPolicyToProjection, modelAgentStem, readAgentTiers, resolveModelPolicy, writeMarkdownAgentSurface } from "../core/tools/aidlc-model-policy.ts";
+import type { ModelHarness } from "../core/tools/aidlc-model-policy.ts";
 
 export function nativeExecutable(): string {
   const executable = process.env.LB_AIDLC_NATIVE_EXECUTABLE;
@@ -113,6 +115,79 @@ function completeCodexRunners(project: string): void {
   }
 }
 
+function inheritClaudeProvider(project: string): void {
+  const path = join(project, ".claude/settings.json");
+  const settings = JSON.parse(readFileSync(path, "utf8"));
+  for (const key of Object.keys(settings.env ?? {})) {
+    if (key === "CLAUDE_CODE_USE_BEDROCK" || key === "AWS_REGION" || /^ANTHROPIC_DEFAULT_.*_MODEL$/.test(key)) {
+      delete settings.env[key];
+    }
+  }
+  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  const onboardingPath = join(project, ".claude/CLAUDE.md");
+  const onboarding = readFileSync(onboardingPath, "utf8");
+  const bedrockRequirement = /^- \*\*AWS Bedrock access\*\*:.*$/gm;
+  if (onboarding.match(bedrockRequirement)?.length !== 1) {
+    throw new Error("Claude onboarding provider prerequisite changed upstream; review the LB adapter.");
+  }
+  writeFileSync(onboardingPath, onboarding.replace(bedrockRequirement,
+    "- **Model provider**: Use the provider and models configured in your Claude user or local settings. The Logicbroker distribution does not enable Bedrock or pin AWS model IDs. Direct Claude users need their Claude login; intentional Bedrock users need their chosen AWS credentials, region and model access. See Claude's provider documentation for that setup. Repository refreshes must retain existing provider choices.",
+  ));
+}
+
+function inheritSessionModels(project: string, harness: ModelHarness): void {
+  // Use AWS's persistent inheritance projection, including on native refresh.
+  // Explicit per-agent model/effort policies still take precedence over the cap.
+  const memory = join(project, "aidlc/spaces/default/memory/org.md");
+  const rules = readFileSync(memory, "utf8");
+  if (rules.startsWith("---")) throw new Error("AWS org model policy changed; review the LB inheritance default.");
+  writeFileSync(memory, "---\n# LB default: AWS's templated projection inherits the session model and effort.\n# This does not change agent responsibilities, workflow stages or scopes.\ntier_cap: templated\n---\n\n" + rules);
+  const leaf = harnessLeaf(harness);
+  applyModelPolicyToProjection(project, leaf, harness);
+  // AWS's native writer updates executable agent surfaces. Keep the copied
+  // reference Markdown consistent with those surfaces as well.
+  if (harness === "codex" || harness === "opencode") {
+    for (const [name, tier] of Object.entries(readAgentTiers(join(project, leaf)))) {
+      const path = join(project, leaf, "agents", `${modelAgentStem(name)}.md`);
+      writeFileSync(path, writeMarkdownAgentSurface(readFileSync(path, "utf8"),
+        resolveModelPolicy(null, name, tier, harness, "templated"),
+        { effortKey: harness === "opencode" ? "variant" : "effort" },
+      ));
+    }
+  }
+  if (harness === "codex") {
+    const path = join(project, ".codex/config.toml");
+    const content = readFileSync(path, "utf8");
+    const start = content.indexOf("# Model: these session defaults");
+    const end = content.indexOf("[model_providers.amazon-bedrock.aws]");
+    if (start < 0 || end < start) throw new Error("AWS Codex provider layout changed; review the LB adapter.");
+    writeFileSync(path, content.slice(0, start) +
+      "# Use the session/user model and provider. LB does not select Bedrock or pin a model.\n" +
+      "# The inactive Bedrock definition below supports native `config providers`.\n" +
+      "# Bedrock users must review its profile/region against their chosen settings.\n\n" + content.slice(end));
+  }
+  if (harness === "kiro") {
+    const path = join(project, ".kiro/settings/cli.json");
+    const config = JSON.parse(readFileSync(path, "utf8"));
+    config["chat.modelDefaults"] = {};
+    writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+  }
+  if (harness !== "claude") {
+    const path = join(project, "AGENTS.md");
+    let content = readFileSync(path, "utf8");
+    if (harness === "codex" || harness === "opencode") {
+      content = content.replace(/^- \*\*Model(?:\/provider| provider)\*\*:.*$/m,
+        "- **Model/provider**: Use your chosen host provider and session model. LB agent roles inherit that model and effort through AWS's persistent `tier_cap: templated` policy in `aidlc/spaces/default/memory/org.md`. Explicit `aidlc config models` agent choices still win. Review existing provider, AWS profile/region and model settings during upgrades; do not switch an intentional provider to work around missing credentials.");
+    }
+    if (harness === "codex") {
+      content = content.replace(/^- \*\*Personal overrides\*\*:.*$/m,
+        "- **Personal settings**: User settings live in `~/.codex/config.toml`; trusted project settings can override them. LB omits session model/provider selection. If you use Bedrock, reconcile the project's retained AWS profile/region template with your chosen settings before starting a session.");
+    }
+    if (harness === "kiro-ide") content = content.replace("Sign in and select Claude Opus 4.8 as the chat model before starting a workflow.", "Sign in and select a chat model available to your account before starting a workflow.");
+    writeFileSync(path, content);
+  }
+}
+
 export function assemble(output: string): string {
   const version = JSON.parse(run(nativeExecutable(), ["version", "--json"]));
   if (version.binaryVersion !== RELEASE.upstream.engineVersion) throw new Error("Native binary version differs from distribution provenance.");
@@ -136,6 +211,8 @@ export function assemble(output: string): string {
       const project = join(staging, "runtime", harness);
       const plugin = join(staging, "dist/plugins", RELEASE.plugin, harness);
       cpSync(join(ROOT, "dist-release", harness), project, { recursive: true });
+      if (harness === "claude") inheritClaudeProvider(project);
+      inheritSessionModels(project, harness as ModelHarness);
       cpSync(join(ROOT, "dist/plugins", RELEASE.plugin, harness), plugin, { recursive: true });
       const leaf = harnessLeaf(harness);
       // Retain the native compose source in the installed harness so a refresh
@@ -208,7 +285,7 @@ export function assemble(output: string): string {
       sourceCommit: run("git", ["rev-parse", "HEAD"]).trim(),
       workingTreeDirty: run("git", ["status", "--porcelain"]).trim().length > 0,
       pluginVersion: pluginMetadata.version,
-      packagingAdapters: ["codex-native-runner-completion"],
+      packagingAdapters: ["codex-native-runner-completion", "claude-inherit-provider", "session-model-inheritance"],
       acceptedAdvisories: ["opencode has no stage summary region; generated stage table verified unchanged"],
       verification: { kind: "deterministic-composition-and-artifact-dependencies", scopes: checks },
       files: inventory(staging),
