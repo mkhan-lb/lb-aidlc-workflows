@@ -122,6 +122,15 @@ function inheritClaudeProvider(project: string): void {
     }
   }
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  const onboardingPath = join(project, ".claude/CLAUDE.md");
+  const onboarding = readFileSync(onboardingPath, "utf8");
+  const bedrockRequirement = /^- \*\*AWS Bedrock access\*\*:.*$/gm;
+  if (onboarding.match(bedrockRequirement)?.length !== 1) {
+    throw new Error("Claude onboarding provider prerequisite changed upstream; review the LB adapter.");
+  }
+  writeFileSync(onboardingPath, onboarding.replace(bedrockRequirement,
+    "- **Model provider**: Use the provider and models configured in your Claude user or local settings. The Logicbroker distribution does not enable Bedrock or pin AWS model IDs. Direct Claude users need their Claude login; intentional Bedrock users need their chosen AWS credentials, region and model access. See Claude's provider documentation for that setup. Repository refreshes must retain existing provider choices.",
+  ));
 }
 
 export function assemble(output: string): string {

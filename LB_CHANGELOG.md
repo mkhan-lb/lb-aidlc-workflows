@@ -1,5 +1,14 @@
 # Logicbroker distribution changelog
 
+## [0.2.2] - 2026-09-10
+
+Complete the 2.8.1 provider change before promoting the release candidate. The
+Claude onboarding instructions now agree with its settings: use the developer's
+chosen provider, with Bedrock optional. Upgrade through the matching ai-skills pin.
+
+- Remove the stale claim that fresh LB Claude projects require Bedrock credentials.
+- Supersede the 0.2.1 prerelease without changing its published assets or tag.
+
 ## [0.2.1] - 2026-09-10
 
 Refresh the LB distribution onto official AWS AI-DLC 2.8.1. Update the native

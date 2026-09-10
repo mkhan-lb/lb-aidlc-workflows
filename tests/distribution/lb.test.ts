@@ -197,6 +197,10 @@ describe("combined Logicbroker distribution", () => {
     expect(settings.env.AWS_AIDLC_DEFAULT_SCOPE).toBe(stock.env.AWS_AIDLC_DEFAULT_SCOPE);
     expect(settings.hooks).toEqual(stock.hooks);
     expect(settings.permissions).toEqual(stock.permissions);
+    const onboarding = readFileSync(join(artifact, "runtime/claude/.claude/CLAUDE.md"), "utf8");
+    expect(onboarding).toContain("**Model provider**");
+    expect(onboarding).toContain("Direct Claude users need their Claude login");
+    expect(onboarding).not.toContain("**AWS Bedrock access**");
   });
 
   test("includes exactly the seven requested AWS harnesses", () => {

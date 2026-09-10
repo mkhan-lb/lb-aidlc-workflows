@@ -55,7 +55,7 @@ particular service's assumptions into this reusable plugin.
 
 ## Native installation and upgrades
 
-Distribution 0.2.1 uses the official AWS AI-DLC **2.8.1 native binary** with
+Distribution 0.2.2 uses the official AWS AI-DLC **2.8.1 native binary** with
 Logicbroker's separately versioned, harness archives carrying the service plugin. Consumers need
 neither Bun, Node.js, nor Python. Bun and TypeScript remain maintainer build tools.
 The AWS commit is `215afe1a61cb06e43002f5ace9ede10dfad80ed4` (`v2.8.1`).
@@ -64,7 +64,8 @@ The service plugin remains 0.1.1; the AWS engine sources are unchanged.
 The LB Claude packaging adapter omits AWS's `CLAUDE_CODE_USE_BEDROCK`,
 `AWS_REGION`, and `ANTHROPIC_DEFAULT_*_MODEL` defaults. Fresh installations inherit
 the developer's provider and model configuration instead of requiring AWS
-credentials. This changes only the composed LB Claude settings; AWS's stock
+credentials. The composed Claude onboarding text describes this same provider choice. This
+changes only the composed LB Claude settings and onboarding; AWS's stock
 runtime and the other six harnesses are unchanged. Existing provider/model
 choices must be reviewed and retained before applying an upgrade. Teams that
 use Bedrock should keep their chosen region, authentication and model pins in
@@ -209,7 +210,7 @@ legacy adoption, conflicts, dry-run preservation, and repeat configuration. They
 do not claim a live model completed a service in every harness.
 
 Publish from a clean reviewed commit using a distinct downstream tag
-`lb-v0.2.1`. Publish the seven harness archives, manifest, and combined tarball;
+`lb-v0.2.2`. Publish the seven harness archives, manifest, and combined tarball;
 record their actual SHA-256 values in ai-skills only after verifying the published
 assets. AWS's binary and runtime retain their official AWS provenance. Do not
 relabel a fork binary as an official AWS release.
