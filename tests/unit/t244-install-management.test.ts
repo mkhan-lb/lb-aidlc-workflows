@@ -166,7 +166,7 @@ function writeVerifierCandidate(root: string): void {
 
 function workflowJob(workflow: string, name: string): string {
   const match = new RegExp(
-    `\\n  ${name}:\\n[\\s\\S]*?(?=\\n  [a-z][a-z0-9-]*:\\n|$)`,
+    `\\n  ${name}:\\n[\\s\\S]*?(?=\\n  [a-z][a-z0-9_-]*:\\n|$)`,
   ).exec(workflow);
   if (!match) throw new Error(`release workflow has no ${name} job`);
   return match[0];
@@ -1005,6 +1005,52 @@ describe("t244 management lifecycle", () => {
     expect(existsSync(join(machine, "versions", REMOVABLE_VERSION))).toBe(false);
   }, process.platform === "win32" ? 600_000 : 240_000);
 
+  // install.sh runs the first install under `umask 077`; a later `aidlc update`
+  // runs under the user's shell umask (typically 022), so the re-extracted
+  // candidate carries different modes than the installed tree. Same-release
+  // identity must not depend on that difference.
+  test.skipIf(process.platform === "win32")(
+    "same-version update succeeds when the install and update umasks differ",
+    () => {
+      const release = fixture(AIDLC_VERSION, { binary: "executable" });
+      const machine = temp("aidlc-t244-umask-machine-");
+      const project = temp("aidlc-t244-umask-project-");
+      mkdirSync(join(project, ".git"));
+      const env = envFor(machine);
+      const runtimeFile = join(
+        machine, "versions", AIDLC_VERSION, "runtime", "claude", ".claude", "settings.json",
+      );
+      const originalUmask = process.umask(0o077);
+      try {
+        const installed = run(LIFECYCLE, [
+          "update", "--version", AIDLC_VERSION, "--from", release,
+        ], project, env);
+        expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+        expect(statSync(runtimeFile).mode & 0o777).toBe(0o600);
+        process.umask(0o022);
+        const dryRun = run(LIFECYCLE, [
+          "update", "--version", AIDLC_VERSION, "--from", release, "--dry-run",
+        ], project, env);
+        expect(dryRun.status, dryRun.stdout + dryRun.stderr).toBe(0);
+        expect(dryRun.stdout).toContain(
+          `You're on the latest version of aidlc (${AIDLC_VERSION}); nothing to update.`,
+        );
+        const noop = run(LIFECYCLE, [
+          "update", "--version", AIDLC_VERSION, "--from", release,
+        ], project, env);
+        expect(noop.status, noop.stdout + noop.stderr).toBe(0);
+        expect(noop.stdout).toContain(
+          `You're on the latest version of aidlc (${AIDLC_VERSION}).`,
+        );
+      } finally {
+        process.umask(originalUmask);
+      }
+      // The installed tree is untouched by a same-version no-op.
+      expect(statSync(runtimeFile).mode & 0o777).toBe(0o600);
+    },
+    120_000,
+  );
+
   test("uninstall removes command and versions while preserving machine state and projects", async () => {
     const release = fixture(AIDLC_VERSION, { binary: "executable" });
     const machine = temp("aidlc-t241-uninstall-");
@@ -1790,6 +1836,7 @@ describe("t244 Windows and completion release surfaces", () => {
       }>;
     };
     expect(parsed.permissions).toEqual({ contents: "read" });
+    expect(parsed.jobs.test_unit.strategy?.["fail-fast"]).toBe(false);
     expect(parsed.jobs["native-smoke"].strategy?.["fail-fast"]).toBe(false);
     expect(parsed.jobs["musl-smoke"].strategy?.["fail-fast"]).toBe(false);
     expect(workflow).toContain("name: Validate release tag and source");
@@ -1828,6 +1875,7 @@ describe("t244 Windows and completion release surfaces", () => {
     expect(workflow).toContain(`build-results-\${{ matrix.directory }}.json`);
     expect(workflow).not.toContain("python3 -m http.server");
     expect(workflow).toContain('env PATH="/usr/bin:/bin"');
+    expect(workflow).not.toContain("duplicate full-suite run disabled");
 
     // Release artifacts must build from projections regenerated ON the runner,
     // never from checkout residue: every dist-consuming job regenerates
@@ -1840,12 +1888,40 @@ describe("t244 Windows and completion release surfaces", () => {
     );
     expect(verifyJob).toContain(regen);
     expect(verifyJob.indexOf(regen)).toBeLessThan(verifyJob.indexOf("- run: bun run check"));
+    const smokeTests = workflowJob(workflow, "test_smoke");
+    expect(smokeTests).toContain("needs: validate");
+    expect(smokeTests).toContain(`ref: \${{ needs.validate.outputs.sha }}`);
+    expect(smokeTests).toContain(regen);
+    expect(smokeTests).toContain("bun tests/run-tests.ts --smoke");
+    const unitTests = workflowJob(workflow, "test_unit");
+    expect(unitTests).toContain("needs: validate");
+    expect(unitTests).toContain("shard: [1, 2, 3, 4]");
+    expect(unitTests).toContain(`ref: \${{ needs.validate.outputs.sha }}`);
+    expect(unitTests).toContain(regen);
+    expect(unitTests).toContain("sudo apt-get install -y -qq zsh");
+    expect(unitTests).toContain(
+      `bun tests/run-tests.ts --unit --shard \${{ matrix.shard }}/4`,
+    );
+    const deepTests = workflowJob(workflow, "test_deep");
+    expect(deepTests).toContain("needs: validate");
+    expect(deepTests).toContain("timeout-minutes: 90");
+    expect(deepTests).toContain(`ref: \${{ needs.validate.outputs.sha }}`);
+    expect(deepTests).toContain(regen);
+    expect(deepTests).toContain(
+      "bun tests/run-tests.ts --integration --e2e --no-llm --parallel 8",
+    );
+    const releaseTests = workflowJob(workflow, "test");
+    expect(releaseTests).toContain(`if: \${{ always() }}`);
+    expect(releaseTests).toContain("needs: [test_smoke, test_unit, test_deep]");
+    expect(releaseTests).toContain('test "$SMOKE_RESULT" = "success"');
+    expect(releaseTests).toContain('test "$UNIT_RESULT" = "success"');
+    expect(releaseTests).toContain('test "$DEEP_RESULT" = "success"');
     const nativeSmokeJob = workflow.slice(
       workflow.indexOf("  native-smoke:"),
       workflow.indexOf("  build:"),
     );
     expect(nativeSmokeJob).toContain(regen);
-    expect(nativeSmokeJob).toContain("needs: [validate, verify]");
+    expect(nativeSmokeJob).toContain("needs: [validate, verify, test]");
     expect(nativeSmokeJob).toContain(`ref: \${{ needs.validate.outputs.sha }}`);
     expect(nativeSmokeJob.indexOf(regen))
       .toBeLessThan(nativeSmokeJob.indexOf("t238-build-binaries.test.ts"));

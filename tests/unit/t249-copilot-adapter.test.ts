@@ -54,6 +54,7 @@ import { fileURLToPath } from "node:url";
 import {
   markSubagentInflight,
   subagentInflightMarkerPath,
+  stateDigest,
 } from "../../core/tools/aidlc-lib.ts";
 import {
   DEFAULT_RECORD_DIR,
@@ -94,7 +95,7 @@ function seedUnapprovedCodeGeneration(projectDir: string): void {
   writeActiveDirectiveMarker(projectDir, {
     kind: "run-stage",
     stage: "code-generation",
-    state_sha256: createHash("sha256").update(state).digest("hex"),
+    state_sha256: stateDigest(state),
   });
 }
 
@@ -178,13 +179,15 @@ function orchestrationProject(): string {
 function compiledBinary(): string | null {
   const explicit = process.env.AIDLC_TEST_COMPILED_EXECUTABLE;
   if (explicit && existsSync(explicit)) return realpathSync(explicit);
-  const results = join(REPO_ROOT, "build", "binaries", "build-results.json");
+  const results = join(REPO_ROOT, "build", "binaries", "build-results-native.json");
   if (!existsSync(results)) return null;
   const doc = JSON.parse(readFileSync(results, "utf-8")) as { results?: Array<{ name?: string; artifact?: string }> };
   const artifact = doc.results?.find((entry) => entry.name === "native")?.artifact;
   return artifact && existsSync(artifact) ? realpathSync(artifact) : null;
 }
 const COMPILED_BINARY = compiledBinary();
+const COMPILED_COVERAGE_REQUIRED =
+  process.env.AIDLC_REQUIRE_COMPILED_COVERAGE === "1";
 
 function readAudit(dir: string): string {
   const auditDir = seededAuditDir(dir);
@@ -384,6 +387,10 @@ function driveToRunStage(dir: string, session: string) {
 }
 
 describe("t249 Copilot hook adapter (live-captured payload fixtures)", () => {
+  test("0a: sharded unit execution has compiled dispatcher coverage", () => {
+    expect(!COMPILED_COVERAGE_REQUIRED || COMPILED_BINARY !== null).toBe(true);
+  });
+
   test("0: native write, shell, and Agent paths enforce Plan Approval", () => {
     const dir = scratchProject(true);
     seedUnapprovedCodeGeneration(dir);
@@ -728,6 +735,33 @@ describe("t249 Copilot hook adapter (live-captured payload fixtures)", () => {
     expect(r.code).toBe(0);
     expect(r.stdout.trim()).toBe("");
   });
+
+  test.skipIf(process.platform === "win32")(
+    "11a: compiled executable delegation runs core hooks through the engine route",
+    () => {
+      const dir = scratchProject(true);
+      const executable = join(dir, "aidlc-native-stub");
+      writeFileSync(
+        executable,
+        `#!/bin/sh\nexec bun ${JSON.stringify(join(dir, ".aidlc", "tools", "aidlc.ts"))} "$@"\n`,
+        { mode: 0o755 },
+      );
+
+      const r = runAdapter(
+        dir,
+        "validate-state",
+        { hook_event_name: "PreCompact", cwd: dir, session_id: "t249-native" },
+        { AIDLC_COMPILED_EXECUTABLE: executable },
+      );
+
+      expect(r.code).toBe(0);
+      expect(
+        existsSync(
+          join(seededRecordDir(dir), ".aidlc-hooks-health", "validate-state.last"),
+        ),
+      ).toBe(true);
+    },
+  );
 
   test("13: reviewer-scope forwarding blocks a sibling read via the ledger identity", () => {
     const dir = scratchProject(true);
@@ -2002,7 +2036,7 @@ describe("t249 Copilot hook adapter (live-captured payload fixtures)", () => {
       if (shape === "corrupt") writeFileSync(path, "{bad-json\n");
       if (shape === "legacy") {
         const state = readFileSync(seededStateFile(recovery), "utf-8");
-        writeFileSync(path, JSON.stringify({ version: 1, stage: "requirements-analysis", state_sha256: createHash("sha256").update(state).digest("hex") }));
+        writeFileSync(path, JSON.stringify({ version: 1, stage: "requirements-analysis", state_sha256: stateDigest(state) }));
       }
       const stopped = runAdapter(recovery, "continue-workflow", { ...FIXTURES.stop, cwd: recovery, session_id: `recovery-${shape}` });
       const reason = (JSON.parse(stopped.stdout) as { reason: string }).reason;
@@ -2030,7 +2064,7 @@ describe("t249 Copilot hook adapter (live-captured payload fixtures)", () => {
         writeFileSync(path, `${JSON.stringify({
           version: 1,
           stage: "requirements-analysis",
-          state_sha256: createHash("sha256").update(state).digest("hex"),
+          state_sha256: stateDigest(state),
         })}\n`);
       }
       const human = runAdapter(dir, "record-human-turn", {
