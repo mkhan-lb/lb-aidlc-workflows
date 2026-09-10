@@ -113,6 +113,17 @@ function completeCodexRunners(project: string): void {
   }
 }
 
+function inheritClaudeProvider(project: string): void {
+  const path = join(project, ".claude/settings.json");
+  const settings = JSON.parse(readFileSync(path, "utf8"));
+  for (const key of Object.keys(settings.env ?? {})) {
+    if (key === "CLAUDE_CODE_USE_BEDROCK" || key === "AWS_REGION" || /^ANTHROPIC_DEFAULT_.*_MODEL$/.test(key)) {
+      delete settings.env[key];
+    }
+  }
+  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+}
+
 export function assemble(output: string): string {
   const version = JSON.parse(run(nativeExecutable(), ["version", "--json"]));
   if (version.binaryVersion !== RELEASE.upstream.engineVersion) throw new Error("Native binary version differs from distribution provenance.");
@@ -136,6 +147,7 @@ export function assemble(output: string): string {
       const project = join(staging, "runtime", harness);
       const plugin = join(staging, "dist/plugins", RELEASE.plugin, harness);
       cpSync(join(ROOT, "dist-release", harness), project, { recursive: true });
+      if (harness === "claude") inheritClaudeProvider(project);
       cpSync(join(ROOT, "dist/plugins", RELEASE.plugin, harness), plugin, { recursive: true });
       const leaf = harnessLeaf(harness);
       // Retain the native compose source in the installed harness so a refresh
@@ -208,7 +220,7 @@ export function assemble(output: string): string {
       sourceCommit: run("git", ["rev-parse", "HEAD"]).trim(),
       workingTreeDirty: run("git", ["status", "--porcelain"]).trim().length > 0,
       pluginVersion: pluginMetadata.version,
-      packagingAdapters: ["codex-native-runner-completion"],
+      packagingAdapters: ["codex-native-runner-completion", "claude-inherit-provider"],
       acceptedAdvisories: ["opencode has no stage summary region; generated stage table verified unchanged"],
       verification: { kind: "deterministic-composition-and-artifact-dependencies", scopes: checks },
       files: inventory(staging),

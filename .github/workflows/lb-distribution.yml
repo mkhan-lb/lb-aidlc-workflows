@@ -29,10 +29,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/aws-aidlc"
-          gh release download v2.8.0 --repo awslabs/aidlc-workflows \
+          gh release download v2.8.1 --repo awslabs/aidlc-workflows \
             --pattern aidlc-linux-x64 --dir "$RUNNER_TEMP/aws-aidlc"
           cd "$RUNNER_TEMP/aws-aidlc"
-          echo 'c7ddca2449823d05d4d4e80bd424fc7a58acad754452b4a61ca55221753dcc88  aidlc-linux-x64' | sha256sum --check
+          echo '61be3a8521693ab80e84da09c4264ce6623c86333740df3f64a12a8c89279213  aidlc-linux-x64' | sha256sum --check
           chmod +x aidlc-linux-x64
           echo "LB_AIDLC_NATIVE_EXECUTABLE=$RUNNER_TEMP/aws-aidlc/aidlc-linux-x64" >> "$GITHUB_ENV"
       - name: Fetch verified legacy migration fixtures

@@ -1,5 +1,18 @@
 # Logicbroker distribution changelog
 
+## [0.2.1] - 2026-09-10
+
+Refresh the LB distribution onto official AWS AI-DLC 2.8.1. Update the native
+machine runtime and refresh each project between workflows using the verified LB
+archive, followed by plugin sync. No manual workflow-record migration is required.
+
+- Include AWS's same-version update, native hook dispatch, and Plan Approval fixes.
+- Stop forcing Bedrock and AWS model pins in fresh LB Claude projections; retain
+  existing developer provider choices when reviewing an upgrade.
+- Keep both service scopes and all seven harness projections, with unchanged AWS
+  engine source and service plugin 0.1.1.
+- Document the native manifest's deletion risk for repo-authored harness knowledge.
+
 ## [0.2.0] - 2026-09-08
 
 Upgrade to official AWS AI-DLC 2.8.0 and its native consumer channel. Refresh

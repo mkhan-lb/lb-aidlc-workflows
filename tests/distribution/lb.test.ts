@@ -187,6 +187,18 @@ describe("native consumer migration", () => {
 });
 
 describe("combined Logicbroker distribution", () => {
+  test("Claude inherits provider choices without changing stock AWS settings or native hooks", () => {
+    const settings = json<{ env: Record<string, string>; hooks: unknown; permissions: unknown }>(join(artifact, "runtime/claude/.claude/settings.json"));
+    const stock = json<{ env: Record<string, string>; hooks: unknown; permissions: unknown }>(join(root, "dist-release/claude/.claude/settings.json"));
+    expect(stock.env.CLAUDE_CODE_USE_BEDROCK).toBe("1");
+    expect(settings.env.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+    expect(settings.env.AWS_REGION).toBeUndefined();
+    expect(Object.keys(settings.env).some((key) => /^ANTHROPIC_DEFAULT_.*_MODEL$/.test(key))).toBe(false);
+    expect(settings.env.AWS_AIDLC_DEFAULT_SCOPE).toBe(stock.env.AWS_AIDLC_DEFAULT_SCOPE);
+    expect(settings.hooks).toEqual(stock.hooks);
+    expect(settings.permissions).toEqual(stock.permissions);
+  });
+
   test("includes exactly the seven requested AWS harnesses", () => {
     expect([...RELEASE.harnesses].sort()).toEqual(Object.keys(nativeSkills).sort());
   });

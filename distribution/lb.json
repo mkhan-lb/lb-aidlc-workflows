@@ -1,11 +1,11 @@
 {
   "name": "lb-aidlc-workflows",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "upstream": {
     "repository": "awslabs/aidlc-workflows",
-    "commit": "0d399dd828b59e84d90f7cc198c69fab9ad8f1a7",
-    "engineVersion": "2.8.0",
-    "release": "v2.8.0"
+    "commit": "215afe1a61cb06e43002f5ace9ede10dfad80ed4",
+    "engineVersion": "2.8.1",
+    "release": "v2.8.1"
   },
   "plugin": "service",
   "scopes": [
