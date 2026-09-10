@@ -1,5 +1,14 @@
 # Logicbroker distribution changelog
 
+## [0.2.3] - 2026-09-10
+
+Agent roles inherit the host session's model and effort through AWS 2.8.1's persistent `tier_cap: templated` policy. Existing projects must reconcile that frontmatter setting without replacing their memory or conventions; explicit model choices remain in `aidlc.settings.json`.
+
+- Remove Codex's automatic Bedrock provider, model, context-window and effort selection; retain the inactive AWS profile/region definition for native provider configuration and require Bedrock users to review those values.
+- Remove provider-specific Codex/OpenCode reviewer pins from executable and reference agent surfaces. Native configuration and repeated LB refreshes retain inheritance and explicit per-agent overrides.
+- Remove Kiro's model-specific effort default and update host model/provider onboarding.
+- Keep the official AWS 2.8.1 native engine and authored upstream sources unchanged.
+
 ## [0.2.2] - 2026-09-10
 
 Complete the 2.8.1 provider change before promoting the release candidate. The

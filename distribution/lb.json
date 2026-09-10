@@ -1,6 +1,6 @@
 {
   "name": "lb-aidlc-workflows",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "upstream": {
     "repository": "awslabs/aidlc-workflows",
     "commit": "215afe1a61cb06e43002f5ace9ede10dfad80ed4",

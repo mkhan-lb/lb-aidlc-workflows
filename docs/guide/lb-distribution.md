@@ -218,3 +218,35 @@ relabel a fork binary as an official AWS release.
 The `Logicbroker distribution` workflow produces a candidate artifact; it does
 not publish releases or switch consumer repositories. The fork's documentation
 workflow requires the `DEPLOY_DOCS=true` repository variable to deploy Pages.
+
+## Provider and model defaults
+
+LB 0.2.3 uses AWS's existing `tier_cap: templated` frontmatter setting in
+`aidlc/spaces/default/memory/org.md`. Here `templated` selects the projection that
+inherits the session model and effort; it does not change reviewer responsibilities,
+workflow stages, scope selection or approval gates. This persisted policy is read by
+the official native model-config and refresh commands, so generated reviewer model
+pins do not return on repeated refreshes. An explicit per-agent `aidlc config models`
+choice still takes precedence. Set only a model ID supported by the chosen host/provider.
+
+Claude and Codex do not select Bedrock automatically. Codex retains an inactive
+`model_providers.amazon-bedrock.aws` definition so native provider configuration can
+record an intentional AWS region/profile. A Bedrock user must reconcile that project's
+region/profile with their chosen user/environment settings: trusted project settings
+have higher precedence than user settings. Missing credentials do not authorize changing
+a deliberate provider. OpenCode reviewers inherit the selected provider's session model.
+Copilot, Cursor and Kiro agents also inherit; Kiro has no shipped model-specific effort pin.
+
+For existing repositories, inspect `org.md`, `team.md`, `project.md` and
+`aidlc.settings*.json` before choosing the model policy. Preserve their bodies and all
+explicit choices. Adding the inheritance frontmatter is a targeted policy migration,
+not permission to replace memory with a new template. The ai-skills installer reports
+and verifies that change separately from byte-preserved knowledge/workflow records.
+If a custom cap or provider configuration cannot be reconciled, stop with a reviewable
+diff instead of forcing the new defaults.
+
+After refresh, run `aidlc doctor --json` plus `aidlc config models --check`,
+`aidlc config providers --check`, `aidlc config runtime --check` and
+`aidlc config trust --check`. Keep section failures visible: provider checking is
+offline and is not a model authentication test. Copilot requires project-folder trust;
+Codex requires hook trust; absent Kiro/OpenCode CLIs prevent live host verification.
